@@ -36,7 +36,7 @@ def getLength():
     
     ytt_api = YouTubeTranscriptApi(
         proxy_config = WebshareProxyConfig(
-            proxy_username="hzfohbme",
+            proxy_username="hzfohbme-rotate",
             proxy_password="akkhm1gzroj0",
         )
     )
@@ -63,7 +63,7 @@ def youtubeLink():
 
     ytt_api = YouTubeTranscriptApi(
         proxy_config = WebshareProxyConfig(
-            proxy_username="hzfohbme",
+            proxy_username="hzfohbme-rotate",
             proxy_password="akkhm1gzroj0",
         )
     )
