@@ -6,6 +6,7 @@ from google.ai.generativelanguage_v1beta.types import content
 import pandas as pd
 import json
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
@@ -33,7 +34,14 @@ def getLength():
         if letter == '?':
             break
     
-    transcript = YouTubeTranscriptApi.get_transcript(video_id)
+    ytt_api = YouTubeTranscriptApi(
+        proxy_config = WebshareProxyConfig(
+            proxy_username="hzfohbme",
+            proxy_password="akkhm1gzroj0",
+        )
+    )
+    
+    transcript = ytt_api.get_transcript(video_id)
 
     return {"length" : transcript[-1]['start']}
 
@@ -52,8 +60,15 @@ def youtubeLink():
             count = count + 1
         if letter == '?':
             break
-        
-    transcript = YouTubeTranscriptApi.get_transcript(video_id)
+
+    ytt_api = YouTubeTranscriptApi(
+        proxy_config = WebshareProxyConfig(
+            proxy_username="hzfohbme",
+            proxy_password="akkhm1gzroj0",
+        )
+    )
+
+    transcript = ytt_api.get_transcript(video_id)
 
     text = ''
 
