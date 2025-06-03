@@ -1,7 +1,6 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request
 from flask_cors import CORS
 import joblib
-import os
 import google.generativeai as genai
 from google.ai.generativelanguage_v1beta.types import content
 import pandas as pd
