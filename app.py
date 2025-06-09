@@ -5,14 +5,28 @@ import google.generativeai as genai
 from google.ai.generativelanguage_v1beta.types import content
 import pandas as pd
 import json
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api.proxies import WebshareProxyConfig
+from supadata import Supadata, SupadataError
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 CORS(app, resources={r"/*": {"origins": "https://truthcreds.netlify.app"}})
 
 
 model = joblib.load("model.pkl")
+
+supadata = Supadata(api_key="sd_e789b55e9041ad706b989a3f59ced98c")
+
+def extract_text(start, end, transcript):
+    start_time = start * 1000
+    end_time = (end + 1)* 1000
+    text = ''
+    for textLine in transcript.content:
+        if(textLine.offset >= start_time and textLine.offset <= end_time):
+            text = text + textLine.text
+        elif(textLine.offset > end_time):
+            break
+
+    return text
 
 @app.route("/", methods = ["POST"])
 def default():
@@ -22,28 +36,23 @@ def default():
 
 @app.route("/getLength/", methods = ["POST"])
 def getLength():
+    
     data = request.get_json()
     link = data["link"]
     video_id = ''
     count = 0
+
     for letter in link:
+        if letter == '?':
+            break
         if count == 3:
             video_id = video_id + letter
         if letter == '/':
             count = count + 1
-        if letter == '?':
-            break
-    
-    ytt_api = YouTubeTranscriptApi(
-        proxy_config = WebshareProxyConfig(
-            proxy_username="hzfohbme",
-            proxy_password="akkhm1gzroj0",
-        )
-    )
-    
-    transcript = ytt_api.get_transcript(video_id)
+            
+    video = supadata.youtube.video(id=link)
 
-    return {"length" : transcript[-1]['start']}
+    return {"length" : video.duration}
 
 @app.route("/youtubeLink/", methods = ["POST"])
 def youtubeLink():
@@ -54,29 +63,16 @@ def youtubeLink():
     video_id = ''
     count = 0
     for letter in link:
+        if letter == '?':
+            break
         if count == 3:
             video_id = video_id + letter
         if letter == '/':
             count = count + 1
-        if letter == '?':
-            break
 
-    ytt_api = YouTubeTranscriptApi(
-        proxy_config = WebshareProxyConfig(
-            proxy_username="hzfohbme",
-            proxy_password="akkhm1gzroj0",
-        )
-    )
+    transcript = supadata.youtube.transcript(video_id=video_id)
 
-    transcript = ytt_api.get_transcript(video_id)
-
-    text = ''
-
-    for line in transcript:
-        if(float(line['start']) >= float(start) and float(line['start']) <= float(end)):
-            text = text + ' ' + line['text']
-
-    claim_text = text
+    claim_text = extract_text(start, end, transcript)
     
     genai.configure(api_key= "AIzaSyBn9UtZUXB4fMKGgs5KMNvVG0zBXvGIX2s")#os.environ["GEMINI_API_KEY"])
 
@@ -178,7 +174,7 @@ def youtubeLink():
     model = genai.GenerativeModel(
     model_name="gemini-1.5-flash",
     generation_config=generation_config,
-    system_instruction="Do not provide dummy data in any case,",
+    system_instruction="Do not provide dummy data in any case",
     )
 
     chat_session = model.start_chat(
@@ -186,7 +182,7 @@ def youtubeLink():
         {
         "role": "user",
         "parts": [
-            "Assume role of claim verifying agent. Consider this text \"\". \n\nProcess the text and extract claims and facts from the text. Extract atleast 10 if possible. For each claim do the following steps:\n1. Find at least 3 and upto 5 evidences that support the claim. Then find atleast 3 and upto 5 evidences that oppose the claim. Do not search for evidences in given text. You can search on internet, research papers, publications, books, etc. Do not provide dummy sources. Provide link of sources. Also provide the exact text from source that supports or opposes the given claim.\n2. For each evidence calculate following values: supporting_evidence_reliability, supporting_evidence_accuracy, supporting_evidence_sentiment_score, opposing_evidence_reliability, opposing_evidence_accuracy, opposing_evidence_sentiment_score. The values should be in range 0 to 1.\n3. Take the average of above values of all the evidences.\n\nReturn the output in specified format.\nSource cred score represents the credibility of the source of evidence. Higher the source's trustworthiness, higher the score. Its value is between 0 to 100.",
+            "Assume role of claim verifying agent. Consider this text \"\". \n\nProcess the text and extract as many claims and facts as possible from the text. Extract minimum 10 claims from text. For each claim do the following steps:\n1. Find at least 3 and upto 5 evidences that support the claim. Then find atleast 3 and upto 5 evidences that oppose the claim. Do not search for evidences in given text. You can search on internet, research papers, publications, books, etc. Do not provide dummy sources. Provide link of sources. Also provide the exact text from source that supports or opposes the given claim.\n2. For each evidence calculate following values: supporting_evidence_reliability, supporting_evidence_accuracy, supporting_evidence_sentiment_score, opposing_evidence_reliability, opposing_evidence_accuracy, opposing_evidence_sentiment_score. The values should be in range 0 to 1.\n3. Take the average of above values of all the evidences.\n\nReturn the output in specified format.\nSource cred score represents the credibility of the source of evidence. Higher the source's trustworthiness, higher the score. Its value is between 0 to 100.",
         ],
         },
     ]
@@ -328,7 +324,7 @@ def text():
         {
         "role": "user",
         "parts": [
-            "Assume role of claim verifying agent. Consider this text \"\". \n\nProcess the text and extract claims from the text. Extract as many claims as possible. For each claim do the following steps:\n1. Find at least 3 and upto 5 evidences that support the claim. Then find atleast 3 and upto 5 evidences that oppose the claim. Do not search for evidences in given text. You can search on internet, research papers, publications, books, etc. Do not provide dummy sources. Provide link of sources. Also provide the exact text from source that supports or opposes the given claim.\n2. For each evidence calculate following values: supporting_evidence_reliability, supporting_evidence_accuracy, supporting_evidence_sentiment_score, opposing_evidence_reliability, opposing_evidence_accuracy, opposing_evidence_sentiment_score. The values should be in range 0 to 1.\n3. Take the average of above values of all the evidences.\n\nReturn the output in specified format.\nSource cred score represents the credibility of the source of evidence. Higher the source's trustworthiness, higher the score. Its value is between 0 to 100.",
+            "Assume role of claim verifying agent. Consider this text \"\". \n\nProcess the text and extract claims from the text. Extract as many claims as possible. Please search the web and verify whether [claim] is true. Use recent news or official sources if possible. For each claim do the following steps:\n1. Find at least 3 and upto 5 evidences that support the claim. Then find atleast 3 and upto 5 evidences that oppose the claim. Do not search for evidences in given text. You can search on internet, research papers, publications, books, etc. Do not provide dummy sources. Provide link of sources. Also provide the exact text from source that supports or opposes the given claim.\n2. For each evidence calculate following values: supporting_evidence_reliability, supporting_evidence_accuracy, supporting_evidence_sentiment_score, opposing_evidence_reliability, opposing_evidence_accuracy, opposing_evidence_sentiment_score. The values should be in range 0 to 1.\n3. Take the average of above values of all the evidences.\n\nReturn the output in specified format.\nSource cred score represents the credibility of the source of evidence. Higher the source's trustworthiness, higher the score. Its value is between 0 to 100.",
         ],
         },
     ]
